@@ -1,3 +1,6 @@
+luci
+luci-ssl
+luci-app-attendedsysupgrade
 wireguard-tools
 travelmate
 luci-app-travelmate
