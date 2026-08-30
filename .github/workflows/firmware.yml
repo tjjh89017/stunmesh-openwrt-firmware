@@ -9,14 +9,6 @@ on:
       - 'docs/**'
       - 'LICENSE'
       - '.plan/**'
-  pull_request:
-    branches: [main]
-    paths-ignore:
-      - 'README.md'
-      - 'PLAN.md'
-      - 'docs/**'
-      - 'LICENSE'
-      - '.plan/**'
   schedule:
     - cron: '17 22 * * *'
   workflow_dispatch:
