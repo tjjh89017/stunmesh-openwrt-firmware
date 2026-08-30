@@ -1,4 +1,4 @@
 wireguard-tools
 travelmate
 stunmesh-go
-stunmesh-provisioner
+stunmesh-agent

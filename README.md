@@ -114,7 +114,7 @@ never on `pull_request`).
 `setup-imagebuilder` adds the `stunmesh-openwrt` apk feed
 (`https://tjjh89017.github.io/stunmesh-openwrt`) to the ImageBuilder's
 `repositories` file and installs its signing key, so `configs/packages.txt`
-can list `stunmesh-go` / `stunmesh-provisioner` packages directly. That URL
+can list `stunmesh-go` / `stunmesh-agent` packages directly. That URL
 is this action's default `feed_url` input. To point at a different feed
 (a fork, a private mirror, or if the feed's publish location ever changes),
 set the `STUNMESH_FEED_URL` repository variable
