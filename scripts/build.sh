@@ -15,7 +15,8 @@ output_dir="${8:?output_dir is required}"
 packages="$(grep -vE '^\s*(#|$)' "$packages_file" | tr '\n' ' ' | sed -E 's/[[:space:]]+$//')"
 files_abs="$(cd "$files_dir" && pwd)"
 
-make -C "$ib_dir" image PROFILE="$profile" PACKAGES="$packages" FILES="$files_abs"
+# redirect to stderr: callers capture this script's stdout as the image path
+make --no-print-directory -C "$ib_dir" image PROFILE="$profile" PACKAGES="$packages" FILES="$files_abs" >&2
 
 src="$(find "$ib_dir/bin" -type f -name '*-sysupgrade.bin' | head -n1)"
 if [ -z "$src" ]; then
