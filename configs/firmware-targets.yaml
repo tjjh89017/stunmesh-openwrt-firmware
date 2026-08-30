@@ -26,3 +26,17 @@ firmware_targets:
     target: ath79
     subtarget: nand
     profile: glinet_gl-ar300m-nand
+
+  - id: gl-microuter-n300
+    model: gl-microuter-n300
+    variant: default
+    target: ramips
+    subtarget: mt76x8
+    profile: glinet_microuter-n300
+
+  - id: cudy-tr3000-v1
+    model: cudy-tr3000
+    variant: default
+    target: mediatek
+    subtarget: filogic
+    profile: cudy_tr3000-v1
