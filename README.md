@@ -75,6 +75,19 @@ A daily (and push/manual-triggered) GitHub Actions workflow:
 A documentation-only change or an unchanged fingerprint does not trigger a
 new firmware build or Release.
 
+## OpenWrt version selection
+
+The OpenWrt series is pinned manually in `configs/openwrt.yaml`
+(`series: "25.12"`). At CI time, `scripts/check-openwrt-version.sh` fetches
+https://downloads.openwrt.org/releases/, matches only `25.12.N/` hrefs within
+that series, and picks the highest with `sort -V` to resolve the latest patch
+release.
+
+The resolved version drives the ImageBuilder/feed URLs and enters the build
+fingerprint, so a new upstream patch release is picked up automatically and
+triggers a rebuild and new Release. Moving to a new series (e.g. `25.12` ->
+`26.01`) means editing `configs/openwrt.yaml`.
+
 ## Releases
 
 Each Release is tagged `firmware-{build_id}` and contains:
