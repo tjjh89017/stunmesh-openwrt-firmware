@@ -1,4 +1,5 @@
 wireguard-tools
 travelmate
+luci-app-travelmate
 stunmesh-go
 stunmesh-agent
