@@ -269,7 +269,7 @@ jobs:
           if-no-files-found: error
 
   build-required:
-    name: Build required
+    name: Build
     needs: [check, build]
     if: always()
     runs-on: ubuntu-latest
@@ -341,3 +341,26 @@ jobs:
             --title "$tag" \
             --target "$GITHUB_SHA" \
             version.json sha256sums artifacts/*.bin artifacts/manifest-*.txt
+
+  prune:
+    name: Prune Release
+    needs: publish
+    if: needs.publish.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Prune releases (keep newest 10)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/${{ github.repository }}/releases" \
+            --jq '.[] | "\(.id)\t\(.tag_name)"' \
+            | sort -k1,1 -rn | cut -f2 | { grep -- '^firmware-' || true; } \
+            | tail -n +11 | while IFS= read -r tag; do
+                echo "I: pruning release $tag"
+                gh release delete "$tag" --repo "${{ github.repository }}" \
+                  --yes --cleanup-tag \
+                  || echo "::warning::failed to delete release $tag (continuing)"
+              done
