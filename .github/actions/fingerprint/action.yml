@@ -1,0 +1,52 @@
+name: Compute build fingerprint
+description: Compute the project input hash and the build fingerprint (spec §20-21)
+
+inputs:
+  openwrt_version:
+    description: 'Resolved OpenWrt version, e.g. "25.12.5"'
+    required: true
+  targets_file:
+    description: 'Path to configs/firmware-targets.yaml'
+    required: true
+  packages_file:
+    description: 'Path to configs/packages.txt'
+    required: true
+  feed_url:
+    description: 'stunmesh-openwrt feed base URL (spec §21 feed configuration)'
+    required: true
+  manifests:
+    description: 'Newline-separated manifest file paths, sorted by firmware-target id'
+    required: true
+
+outputs:
+  input_hash:
+    description: 'Project input hash (spec §20)'
+    value: ${{ steps.hash.outputs.input_hash }}
+  fingerprint:
+    description: 'Build fingerprint (spec §21)'
+    value: ${{ steps.fp.outputs.fingerprint }}
+
+runs:
+  using: composite
+  steps:
+    - id: hash
+      shell: bash
+      run: |
+        set -euo pipefail
+        input_hash="$(scripts/calculate-input-hash.sh "$GITHUB_WORKSPACE")"
+        echo "input_hash=$input_hash" >> "$GITHUB_OUTPUT"
+
+    - id: fp
+      shell: bash
+      env:
+        OPENWRT_VERSION: ${{ inputs.openwrt_version }}
+        TARGETS_FILE: ${{ inputs.targets_file }}
+        PACKAGES_FILE: ${{ inputs.packages_file }}
+        FEED_URL: ${{ inputs.feed_url }}
+        MANIFESTS: ${{ inputs.manifests }}
+        INPUT_HASH: ${{ steps.hash.outputs.input_hash }}
+      run: |
+        set -euo pipefail
+        mapfile -t manifest_files <<< "$MANIFESTS"
+        fingerprint="$(scripts/calculate-fingerprint.sh "$OPENWRT_VERSION" "$INPUT_HASH" "$TARGETS_FILE" "$PACKAGES_FILE" "$FEED_URL" "${manifest_files[@]}")"
+        echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"

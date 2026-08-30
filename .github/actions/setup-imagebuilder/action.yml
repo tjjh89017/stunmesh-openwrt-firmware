@@ -1,0 +1,56 @@
+name: Setup ImageBuilder
+description: Download, cache, and extract the OpenWrt ImageBuilder for one target/subtarget, and configure the stunmesh-openwrt feed
+
+inputs:
+  version:
+    description: 'OpenWrt version, e.g. "25.12.5"'
+    required: true
+  target:
+    description: 'OpenWrt target, e.g. "ath79"'
+    required: true
+  subtarget:
+    description: 'OpenWrt subtarget, e.g. "nand"'
+    required: true
+  series:
+    description: 'Configured OpenWrt release series, e.g. "25.12" (feed directory name)'
+    required: true
+  # Override via vars.STUNMESH_FEED_URL if the feed ever moves.
+  feed_url:
+    description: 'Base URL of the stunmesh-openwrt apk feed'
+    required: false
+    default: https://tjjh89017.github.io/stunmesh-openwrt
+
+outputs:
+  path:
+    description: 'Path to the extracted ImageBuilder directory'
+    value: ${{ steps.dest.outputs.path }}
+
+runs:
+  using: composite
+  steps:
+    - id: dest
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        TARGET: ${{ inputs.target }}
+        SUBTARGET: ${{ inputs.subtarget }}
+      run: |
+        set -euo pipefail
+        echo "path=${RUNNER_TEMP}/imagebuilder-${VERSION}-${TARGET}-${SUBTARGET}" >> "$GITHUB_OUTPUT"
+
+    - uses: actions/cache@v6
+      with:
+        path: ${{ steps.dest.outputs.path }}
+        key: imagebuilder-${{ inputs.version }}-${{ inputs.target }}-${{ inputs.subtarget }}
+
+    - shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        TARGET: ${{ inputs.target }}
+        SUBTARGET: ${{ inputs.subtarget }}
+        DEST: ${{ steps.dest.outputs.path }}
+        FEED_URL: ${{ inputs.feed_url }}
+        SERIES: ${{ inputs.series }}
+      run: |
+        set -euo pipefail
+        bash "${GITHUB_ACTION_PATH}/setup.sh" "$VERSION" "$TARGET" "$SUBTARGET" "$DEST" "$FEED_URL" "$SERIES"

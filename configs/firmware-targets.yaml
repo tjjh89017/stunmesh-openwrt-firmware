@@ -1,0 +1,28 @@
+firmware_targets:
+  - id: gl-ar750s-nor
+    model: gl-ar750s
+    variant: nor
+    target: ath79
+    subtarget: nand
+    profile: glinet_gl-ar750s-nor
+
+  - id: gl-ar750s-nor-nand
+    model: gl-ar750s
+    variant: nor-nand
+    target: ath79
+    subtarget: nand
+    profile: glinet_gl-ar750s-nor-nand
+
+  - id: gl-ar300m-nor
+    model: gl-ar300m
+    variant: nor
+    target: ath79
+    subtarget: nand
+    profile: glinet_gl-ar300m-nor
+
+  - id: gl-ar300m-nand
+    model: gl-ar300m
+    variant: nand
+    target: ath79
+    subtarget: nand
+    profile: glinet_gl-ar300m-nand

@@ -1,0 +1,24 @@
+name: Resolve OpenWrt version
+description: Resolve the latest OpenWrt patch release in a configured series
+
+inputs:
+  series:
+    description: 'OpenWrt release series, e.g. "25.12"'
+    required: true
+
+outputs:
+  version:
+    description: 'Latest patch release, e.g. "25.12.5"'
+    value: ${{ steps.resolve.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - id: resolve
+      shell: bash
+      env:
+        SERIES: ${{ inputs.series }}
+      run: |
+        set -euo pipefail
+        version="$(scripts/check-openwrt-version.sh "$SERIES")"
+        echo "version=$version" >> "$GITHUB_OUTPUT"

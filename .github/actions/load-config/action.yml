@@ -1,0 +1,36 @@
+name: Load firmware config
+description: Parse configs/firmware-targets.yaml, configs/openwrt.yaml, and configs/packages.txt
+
+outputs:
+  matrix:
+    description: 'Build matrix, {"include":[{id,model,variant,target,subtarget,profile}, ...]}'
+    value: ${{ steps.parse.outputs.matrix }}
+  ib_pairs:
+    description: 'JSON array of unique {target,subtarget} ImageBuilder pairs'
+    value: ${{ steps.parse.outputs.ib_pairs }}
+  series:
+    description: 'Configured OpenWrt release series, e.g. "25.12"'
+    value: ${{ steps.parse.outputs.series }}
+  targets_file:
+    description: 'Path to the firmware-targets config file'
+    value: ${{ steps.parse.outputs.targets_file }}
+  packages_file:
+    description: 'Path to the required-packages list'
+    value: ${{ steps.parse.outputs.packages_file }}
+
+runs:
+  using: composite
+  steps:
+    - id: parse
+      shell: bash
+      run: |
+        set -euo pipefail
+        targets_file="configs/firmware-targets.yaml"
+        openwrt_file="configs/openwrt.yaml"
+        packages_file="configs/packages.txt"
+
+        {
+          python3 "${GITHUB_ACTION_PATH}/parse-config.py" "$targets_file" "$openwrt_file"
+          echo "targets_file=$targets_file"
+          echo "packages_file=$packages_file"
+        } >> "$GITHUB_OUTPUT"

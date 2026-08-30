@@ -1,0 +1,343 @@
+name: Firmware
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'README.md'
+      - 'PLAN.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.plan/**'
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - 'README.md'
+      - 'PLAN.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.plan/**'
+  schedule:
+    - cron: '17 22 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firmware-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FEED_URL: ${{ (vars.STUNMESH_FEED_URL != '' && vars.STUNMESH_FEED_URL) || 'https://tjjh89017.github.io/stunmesh-openwrt' }}
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.decide.outputs.changed }}
+      version: ${{ steps.openwrt.outputs.version }}
+      series: ${{ steps.config.outputs.series }}
+      fingerprint: ${{ steps.fingerprint.outputs.fingerprint }}
+      matrix: ${{ steps.config.outputs.matrix }}
+      build_id: ${{ steps.decide.outputs.build_id }}
+      timestamp: ${{ steps.decide.outputs.timestamp }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Load config
+        id: config
+        uses: ./.github/actions/load-config
+
+      - name: Resolve OpenWrt version
+        id: openwrt
+        uses: ./.github/actions/resolve-openwrt
+        with:
+          series: ${{ steps.config.outputs.series }}
+
+      # Multiple ImageBuilders needed here; `uses:` can't loop, so call the script directly.
+      - name: Setup ImageBuilders
+        env:
+          IB_PAIRS: ${{ steps.config.outputs.ib_pairs }}
+          OPENWRT_VERSION: ${{ steps.openwrt.outputs.version }}
+          SERIES: ${{ steps.config.outputs.series }}
+          FEED_URL: ${{ env.FEED_URL }}
+        run: |
+          set -euo pipefail
+          echo "$IB_PAIRS" | jq -r '.[] | [.target, .subtarget] | @tsv' | while IFS=$'\t' read -r target subtarget; do
+            dest="${RUNNER_TEMP}/imagebuilder-${OPENWRT_VERSION}-${target}-${subtarget}"
+            bash .github/actions/setup-imagebuilder/setup.sh "$OPENWRT_VERSION" "$target" "$subtarget" "$dest" "$FEED_URL" "$SERIES"
+          done
+
+      - name: Validate profiles and resolve manifests
+        env:
+          MATRIX: ${{ steps.config.outputs.matrix }}
+          OPENWRT_VERSION: ${{ steps.openwrt.outputs.version }}
+          PACKAGES_FILE: ${{ steps.config.outputs.packages_file }}
+        run: |
+          set -euo pipefail
+          mkdir -p manifests
+          echo "$MATRIX" | jq -r '.include[] | [.id, .target, .subtarget, .profile] | @tsv' \
+            | while IFS=$'\t' read -r id target subtarget profile; do
+            dest="${RUNNER_TEMP}/imagebuilder-${OPENWRT_VERSION}-${target}-${subtarget}"
+            scripts/check-profile.sh "$dest" "$profile"
+            scripts/get-manifest.sh "$dest" "$profile" "$PACKAGES_FILE" "manifests/manifest-${id}.txt"
+          done
+
+      - name: Upload manifests
+        uses: actions/upload-artifact@v7
+        with:
+          name: manifests
+          path: manifests/*.txt
+          if-no-files-found: error
+
+      - name: List manifests sorted by firmware-target id
+        id: list_manifests
+        env:
+          MATRIX: ${{ steps.config.outputs.matrix }}
+        run: |
+          set -euo pipefail
+          files="$(echo "$MATRIX" | jq -r '.include | sort_by(.id) | .[] | "manifests/manifest-" + .id + ".txt"')"
+          {
+            echo "files<<MANIFEST_EOF"
+            echo "$files"
+            echo "MANIFEST_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Compute fingerprint
+        id: fingerprint
+        uses: ./.github/actions/fingerprint
+        with:
+          openwrt_version: ${{ steps.openwrt.outputs.version }}
+          targets_file: ${{ steps.config.outputs.targets_file }}
+          packages_file: ${{ steps.config.outputs.packages_file }}
+          feed_url: ${{ env.FEED_URL }}
+          manifests: ${{ steps.list_manifests.outputs.files }}
+
+      - name: Release gate
+        id: gate
+        uses: ./.github/actions/release-gate
+        with:
+          fingerprint: ${{ steps.fingerprint.outputs.fingerprint }}
+
+      - name: Decide build
+        id: decide
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          GATE_CHANGED: ${{ steps.gate.outputs.changed }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "pull_request" ] || [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            changed=true
+          else
+            changed="$GATE_CHANGED"
+          fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          if [ "$changed" = "true" ]; then
+            echo "build_id=$(date -u +%Y%m%dT%H%M%SZ)" >> "$GITHUB_OUTPUT"
+            echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: Build ${{ matrix.id }}
+    needs: check
+    if: needs.check.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.check.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup ImageBuilder
+        id: ib
+        uses: ./.github/actions/setup-imagebuilder
+        with:
+          version: ${{ needs.check.outputs.version }}
+          target: ${{ matrix.target }}
+          subtarget: ${{ matrix.subtarget }}
+          series: ${{ needs.check.outputs.series }}
+          feed_url: ${{ env.FEED_URL }}
+
+      - name: Validate profile
+        env:
+          IB_PATH: ${{ steps.ib.outputs.path }}
+          PROFILE: ${{ matrix.profile }}
+        run: scripts/check-profile.sh "$IB_PATH" "$PROFILE"
+
+      - name: Download manifest
+        uses: actions/download-artifact@v8
+        with:
+          name: manifests
+          path: manifests
+
+      - name: Collect required packages
+        id: packages
+        env:
+          MANIFEST_FILE: manifests/manifest-${{ matrix.id }}.txt
+        run: |
+          set -euo pipefail
+          json="$(scripts/collect-packages.sh "$MANIFEST_FILE" configs/packages.txt)"
+          echo "json=$json" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare files overlay
+        run: |
+          cp -r files build-overlay
+          find build-overlay -name '.gitkeep' -delete
+
+      - name: Generate firmware metadata
+        env:
+          BUILD_ID: ${{ needs.check.outputs.build_id }}
+          TIMESTAMP: ${{ needs.check.outputs.timestamp }}
+          FINGERPRINT: ${{ needs.check.outputs.fingerprint }}
+          OPENWRT_VERSION: ${{ needs.check.outputs.version }}
+          TARGET_ID: ${{ matrix.id }}
+          MODEL: ${{ matrix.model }}
+          VARIANT: ${{ matrix.variant }}
+          TARGET: ${{ matrix.target }}
+          SUBTARGET: ${{ matrix.subtarget }}
+          PROFILE: ${{ matrix.profile }}
+          PACKAGES_JSON: ${{ steps.packages.outputs.json }}
+        run: |
+          set -euo pipefail
+          scripts/generate-firmware-metadata.sh \
+            build-overlay/etc/firmware-build.json \
+            "$BUILD_ID" "$TIMESTAMP" "$FINGERPRINT" "$OPENWRT_VERSION" \
+            "$TARGET_ID" "$MODEL" "$VARIANT" "$TARGET" "$SUBTARGET" "$PROFILE" "$PACKAGES_JSON"
+
+      - name: Build image
+        id: build
+        env:
+          IB_PATH: ${{ steps.ib.outputs.path }}
+          PROFILE: ${{ matrix.profile }}
+          TARGET_ID: ${{ matrix.id }}
+          OPENWRT_VERSION: ${{ needs.check.outputs.version }}
+          BUILD_ID: ${{ needs.check.outputs.build_id }}
+        run: |
+          set -euo pipefail
+          image_path="$(scripts/build.sh "$IB_PATH" "$PROFILE" configs/packages.txt build-overlay "$TARGET_ID" "$OPENWRT_VERSION" "$BUILD_ID" output)"
+          echo "image_path=$image_path" >> "$GITHUB_OUTPUT"
+
+      - name: Verify image
+        id: verify
+        env:
+          IMAGE_PATH: ${{ steps.build.outputs.image_path }}
+        run: |
+          set -euo pipefail
+          sha256="$(scripts/verify-image.sh "$IMAGE_PATH" | awk '{print $1}')"
+          size="$(stat -c%s "$IMAGE_PATH")"
+          {
+            echo "sha256=$sha256"
+            echo "size=$size"
+            echo "filename=$(basename "$IMAGE_PATH")"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Write result fragment
+        env:
+          TARGET_ID: ${{ matrix.id }}
+          MODEL: ${{ matrix.model }}
+          VARIANT: ${{ matrix.variant }}
+          TARGET: ${{ matrix.target }}
+          SUBTARGET: ${{ matrix.subtarget }}
+          PROFILE: ${{ matrix.profile }}
+          FILENAME: ${{ steps.verify.outputs.filename }}
+          SHA256: ${{ steps.verify.outputs.sha256 }}
+          SIZE: ${{ steps.verify.outputs.size }}
+        run: |
+          set -euo pipefail
+          jq -n \
+            --arg id "$TARGET_ID" --arg model "$MODEL" --arg variant "$VARIANT" \
+            --arg target "$TARGET" --arg subtarget "$SUBTARGET" --arg profile "$PROFILE" \
+            --arg filename "$FILENAME" --arg sha256 "$SHA256" --argjson size "$SIZE" \
+            '{id:$id, model:$model, variant:$variant, target:$target, subtarget:$subtarget, profile:$profile, filename:$filename, sha256:$sha256, size:$size}' \
+            > "result-${TARGET_ID}.json"
+
+      - name: Stage release assets
+        env:
+          TARGET_ID: ${{ matrix.id }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          cp output/*.bin "result-${TARGET_ID}.json" "manifests/manifest-${TARGET_ID}.txt" release-assets/
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: image-${{ matrix.id }}
+          path: release-assets/*
+          if-no-files-found: error
+
+  build-required:
+    name: Build required
+    needs: [check, build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate build requirement
+        env:
+          CHECK_RESULT: ${{ needs.check.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          CHANGED: ${{ needs.check.outputs.changed }}
+        run: |
+          set -euo pipefail
+          if [ "$CHECK_RESULT" != "success" ]; then
+            echo "::error::check job did not succeed" >&2
+            exit 1
+          fi
+          if [ "$CHANGED" = "true" ] && [ "$BUILD_RESULT" != "success" ]; then
+            echo "::error::build job was required but result was '$BUILD_RESULT'" >&2
+            exit 1
+          fi
+          echo "build requirement satisfied"
+
+  publish:
+    name: Publish release
+    needs: [check, build-required]
+    if: needs.check.outputs.changed == 'true' && github.event_name != 'pull_request' && needs.build-required.result == 'success' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download image artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: image-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Assemble version.json
+        env:
+          BUILD_ID: ${{ needs.check.outputs.build_id }}
+          TIMESTAMP: ${{ needs.check.outputs.timestamp }}
+          FINGERPRINT: ${{ needs.check.outputs.fingerprint }}
+          OPENWRT_VERSION: ${{ needs.check.outputs.version }}
+          MATRIX: ${{ needs.check.outputs.matrix }}
+        run: |
+          set -euo pipefail
+          first_id="$(echo "$MATRIX" | jq -r '.include | sort_by(.id) | .[0].id')"
+          packages_json="$(scripts/collect-packages.sh "artifacts/manifest-${first_id}.txt" configs/packages.txt)"
+
+          fragments=()
+          while IFS= read -r f; do
+            fragments+=("$(cat "$f")")
+          done < <(find artifacts -maxdepth 1 -name 'result-*.json' | sort)
+
+          scripts/generate-version-json.sh version.json "$BUILD_ID" "$TIMESTAMP" "$FINGERPRINT" "$OPENWRT_VERSION" "$packages_json" "${fragments[@]}"
+
+      - name: Build sha256sums
+        run: (cd artifacts && sha256sum -- *.bin) > sha256sums
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_ID: ${{ needs.check.outputs.build_id }}
+        run: |
+          set -euo pipefail
+          tag="firmware-${BUILD_ID}"
+          gh release create "$tag" \
+            --title "$tag" \
+            --target "$GITHUB_SHA" \
+            version.json sha256sums artifacts/*.bin artifacts/manifest-*.txt
