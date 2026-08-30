@@ -2,6 +2,8 @@ luci
 luci-ssl
 luci-app-attendedsysupgrade
 wireguard-tools
+luci-proto-wireguard
+luci-app-wireguard
 travelmate
 luci-app-travelmate
 stunmesh-go
