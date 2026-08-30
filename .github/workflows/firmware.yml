@@ -211,12 +211,11 @@ jobs:
         env:
           IB_PATH: ${{ steps.ib.outputs.path }}
           PROFILE: ${{ matrix.profile }}
-          TARGET_ID: ${{ matrix.id }}
           OPENWRT_VERSION: ${{ needs.check.outputs.version }}
           BUILD_ID: ${{ needs.check.outputs.build_id }}
         run: |
           set -euo pipefail
-          image_path="$(scripts/build.sh "$IB_PATH" "$PROFILE" configs/packages.txt build-overlay "$TARGET_ID" "$OPENWRT_VERSION" "$BUILD_ID" output)"
+          image_path="$(scripts/build.sh "$IB_PATH" "$PROFILE" configs/packages.txt build-overlay "$OPENWRT_VERSION" "$BUILD_ID" output)"
           echo "image_path=$image_path" >> "$GITHUB_OUTPUT"
 
       - name: Verify image

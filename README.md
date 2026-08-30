@@ -83,7 +83,7 @@ Each Release is tagged `firmware-{build_id}` and contains:
 version.json
 sha256sums
 
-stunmesh-openwrt-{firmware_target}-{openwrt_version}-{build_id}-sysupgrade.bin
+stunmesh-openwrt-{openwrt_version}-{profile}-{build_id}-sysupgrade.bin
   (one per firmware target)
 
 manifest-{firmware_target}.txt
