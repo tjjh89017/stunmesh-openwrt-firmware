@@ -126,7 +126,7 @@ jobs:
           FORCE: ${{ github.event.inputs.force }}
         run: |
           set -euo pipefail
-          if [ "$FORCE" = "true" ] || [ "$EVENT_NAME" = "pull_request" ] || [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+          if [ "$FORCE" = "true" ] || [ "$EVENT_NAME" = "pull_request" ]; then
             changed=true
           else
             changed="$GATE_CHANGED"
