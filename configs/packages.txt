@@ -5,5 +5,4 @@ wireguard-tools
 luci-proto-wireguard
 travelmate
 luci-app-travelmate
-stunmesh-go
 stunmesh-agent
