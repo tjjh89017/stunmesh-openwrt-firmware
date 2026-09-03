@@ -1,8 +1,4 @@
 #!/bin/sh
-# First-boot hostname: "<MODEL>-<xxx>", board name after the vendor
-# prefix in upper case, last three hex digits of the phy0 MAC in lower
-# case. /etc/config/hostname-setup is the one-shot marker; sysupgrade
-# keeps /etc/config, "sysupgrade -n" and firstboot drop it.
 
 [ -e /etc/config/hostname-setup ] && exit 0
 touch /etc/config/hostname-setup
