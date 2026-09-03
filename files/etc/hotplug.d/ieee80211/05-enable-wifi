@@ -1,0 +1,39 @@
+#!/bin/sh
+# First-boot Wi-Fi setup. The image ships without /etc/config/wireless;
+# OpenWrt generates it from 10-wifi-detect on the first "add" event of
+# each phy, with every radio disabled. This script runs before that,
+# only when the file does not exist yet, so it acts once per fresh
+# install and never touches a config the user (or sysupgrade) kept.
+#
+# It generates the config itself, enables every radio, and names the
+# host and the SSID "<MODEL>-<xxx>": MODEL is the board name after the
+# vendor prefix in upper case, xxx is the last three hex digits of this
+# phy's MAC in lower case. This follows the vendor default SSID scheme.
+
+[ "$ACTION" = "add" ] || exit 0
+[ -e /etc/config/wireless ] && exit 0
+
+. /lib/functions.sh
+
+/sbin/wifi config
+[ -e /etc/config/wireless ] || exit 0
+
+model="$(board_name | sed 's/^[^,]*,//' | tr 'a-z' 'A-Z')"
+suffix="$(cat "/sys/class/ieee80211/$DEVICENAME/macaddress" 2>/dev/null | tr -d ':' | tail -c 4 | tr 'A-Z' 'a-z')"
+
+if [ -n "$model" ] && [ -n "$suffix" ]; then
+	name="$model-$suffix"
+	uci set system.@system[0].hostname="$name"
+	uci commit system
+	echo "$name" > /proc/sys/kernel/hostname
+	for iface in $(uci -q show wireless | sed -n 's/^wireless\.\([^.]*\)=wifi-iface$/\1/p'); do
+		uci set "wireless.$iface.ssid=$name"
+	done
+fi
+
+for radio in $(uci -q show wireless | sed -n 's/^wireless\.\([^.]*\)=wifi-device$/\1/p'); do
+	uci set "wireless.$radio.disabled=0"
+done
+uci commit wireless
+
+exit 0
