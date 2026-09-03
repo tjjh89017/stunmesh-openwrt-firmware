@@ -3,16 +3,17 @@
 # /etc/config/wireless before it runs the uci-defaults, so every
 # radio is already present here.
 #
-# /etc/config/stunmesh-firmware is the one-shot marker. sysupgrade
-# backs up /etc/config, so a kept config carries the marker and is
-# left alone; "sysupgrade -n" and firstboot drop it and get a fresh
-# setup. The marker does not depend on the hostname or SSID values.
+# /etc/config/stunmesh-firmware is the one-shot marker, the same
+# pattern as OpenWrt's 50-attendedsysupgrade. sysupgrade backs up
+# /etc/config, so a kept config carries the marker and is left
+# alone; "sysupgrade -n" and firstboot drop it and get a fresh setup.
 #
 # Name: "<MODEL>-<xxx>", board name after the vendor prefix in upper
 # case, last three hex digits of the phy0 MAC in lower case. OpenWrt
 # 25.12 puts "disabled" on the wifi-iface, older releases on the radio.
 
-[ "$(uci -q get stunmesh-firmware.firstboot.done)" = "1" ] && exit 0
+[ -e /etc/config/stunmesh-firmware ] && exit 0
+touch /etc/config/stunmesh-firmware
 
 . /lib/functions.sh
 
@@ -32,10 +33,5 @@ uci commit wireless
 uci set system.@system[0].hostname="$name"
 uci commit system
 echo "$name" > /proc/sys/kernel/hostname
-
-touch /etc/config/stunmesh-firmware
-uci set stunmesh-firmware.firstboot=setup
-uci set stunmesh-firmware.firstboot.done=1
-uci commit stunmesh-firmware
 
 exit 0
