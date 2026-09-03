@@ -1,0 +1,15 @@
+#!/bin/sh
+# Stock OpenWrt writes every radio with disabled='1' on first boot.
+# Enable each radio so the AP comes up without a manual step.
+# The rest of the wireless config keeps the OpenWrt defaults.
+
+# Generate /etc/config/wireless if the hotplug detection has not
+# run yet, so the loop below sees every radio.
+[ -n "$(uci -q show wireless | grep '=wifi-device$')" ] || wifi config
+
+for radio in $(uci -q show wireless | sed -n 's/^wireless\.\(radio[0-9]*\)=wifi-device$/\1/p'); do
+	uci set "wireless.$radio.disabled=0"
+done
+uci commit wireless
+
+exit 0
