@@ -3,7 +3,7 @@
 # /etc/config/wireless before it runs the uci-defaults, so every
 # radio is already present here.
 #
-# /etc/config/stunmesh-firmware is the one-shot marker, the same
+# /etc/config/wifi-setup is the one-shot marker, the same
 # pattern as OpenWrt's 50-attendedsysupgrade. sysupgrade backs up
 # /etc/config, so a kept config carries the marker and is left
 # alone; "sysupgrade -n" and firstboot drop it and get a fresh setup.
@@ -12,8 +12,8 @@
 # case, last three hex digits of the phy0 MAC in lower case. OpenWrt
 # 25.12 puts "disabled" on the wifi-iface, older releases on the radio.
 
-[ -e /etc/config/stunmesh-firmware ] && exit 0
-touch /etc/config/stunmesh-firmware
+[ -e /etc/config/wifi-setup ] && exit 0
+touch /etc/config/wifi-setup
 
 . /lib/functions.sh
 
