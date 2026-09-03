@@ -44,12 +44,12 @@ to more than one firmware target.
 
 | Firmware target       | Model      | Variant  | OpenWrt target/subtarget | OpenWrt profile              |
 |------------------------|------------|----------|---------------------------|-------------------------------|
+| `cudy-tr3000-v1`       | Cudy TR3000 v1 | Default  | mediatek/filogic          | `cudy_tr3000-v1`              |
+| `gl-ar300m-nand`       | GL-AR300M  | NAND     | ath79/nand                 | `glinet_gl-ar300m-nand`       |
+| `gl-ar300m-nor`        | GL-AR300M  | NOR      | ath79/nand                 | `glinet_gl-ar300m-nor`        |
 | `gl-ar750s-nor`        | GL-AR750S  | NOR      | ath79/nand                 | `glinet_gl-ar750s-nor`        |
 | `gl-ar750s-nor-nand`   | GL-AR750S  | NOR+NAND | ath79/nand                 | `glinet_gl-ar750s-nor-nand`   |
-| `gl-ar300m-nor`        | GL-AR300M  | NOR      | ath79/nand                 | `glinet_gl-ar300m-nor`        |
-| `gl-ar300m-nand`       | GL-AR300M  | NAND     | ath79/nand                 | `glinet_gl-ar300m-nand`       |
 | `gl-microuter-n300`    | GL.iNet microuter-N300 | Default | ramips/mt76x8   | `glinet_microuter-n300`       |
-| `cudy-tr3000-v1`       | Cudy TR3000 v1 | Default  | mediatek/filogic          | `cudy_tr3000-v1`              |
 | `gl-mt300n-v2`         | GL.iNet GL-MT300N v2 | Default | ramips/mt76x8       | `glinet_gl-mt300n-v2`         |
 
 **Warning:** NOR and NOR+NAND (or NAND) images are different, incompatible
