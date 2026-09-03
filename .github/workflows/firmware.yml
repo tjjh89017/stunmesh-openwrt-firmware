@@ -10,13 +10,8 @@ on:
       - 'LICENSE'
       - '.plan/**'
   schedule:
-    - cron: '17 22 * * *'
-  workflow_dispatch:
-    inputs:
-      force:
-        description: 'Skip the input-hash check and rebuild'
-        type: boolean
-        default: false
+    - cron: '17 22 * * 0'
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -29,17 +24,15 @@ env:
   FEED_URL: ${{ (vars.STUNMESH_FEED_URL != '' && vars.STUNMESH_FEED_URL) || 'https://tjjh89017.github.io/stunmesh-openwrt' }}
 
 jobs:
-  check:
-    name: Check
+  prepare:
+    name: Prepare
     runs-on: ubuntu-latest
     outputs:
-      changed: ${{ steps.decide.outputs.changed }}
       version: ${{ steps.openwrt.outputs.version }}
       series: ${{ steps.config.outputs.series }}
-      fingerprint: ${{ steps.fingerprint.outputs.fingerprint }}
       matrix: ${{ steps.config.outputs.matrix }}
-      build_id: ${{ steps.decide.outputs.build_id }}
-      timestamp: ${{ steps.decide.outputs.timestamp }}
+      build_id: ${{ steps.ids.outputs.build_id }}
+      timestamp: ${{ steps.ids.outputs.timestamp }}
     steps:
       - uses: actions/checkout@v7
 
@@ -53,98 +46,20 @@ jobs:
         with:
           series: ${{ steps.config.outputs.series }}
 
-      # Multiple ImageBuilders needed here; `uses:` can't loop, so call the script directly.
-      - name: Setup ImageBuilders
-        env:
-          IB_PAIRS: ${{ steps.config.outputs.ib_pairs }}
-          OPENWRT_VERSION: ${{ steps.openwrt.outputs.version }}
-          SERIES: ${{ steps.config.outputs.series }}
-          FEED_URL: ${{ env.FEED_URL }}
+      - name: Compute build id
+        id: ids
         run: |
           set -euo pipefail
-          echo "$IB_PAIRS" | jq -r '.[] | [.target, .subtarget] | @tsv' | while IFS=$'\t' read -r target subtarget; do
-            dest="${RUNNER_TEMP}/imagebuilder-${OPENWRT_VERSION}-${target}-${subtarget}"
-            bash .github/actions/setup-imagebuilder/setup.sh "$OPENWRT_VERSION" "$target" "$subtarget" "$dest" "$FEED_URL" "$SERIES"
-          done
-
-      - name: Validate profiles and resolve manifests
-        env:
-          MATRIX: ${{ steps.config.outputs.matrix }}
-          OPENWRT_VERSION: ${{ steps.openwrt.outputs.version }}
-          PACKAGES_FILE: ${{ steps.config.outputs.packages_file }}
-        run: |
-          set -euo pipefail
-          mkdir -p manifests
-          echo "$MATRIX" | jq -r '.include[] | [.id, .target, .subtarget, .profile] | @tsv' \
-            | while IFS=$'\t' read -r id target subtarget profile; do
-            dest="${RUNNER_TEMP}/imagebuilder-${OPENWRT_VERSION}-${target}-${subtarget}"
-            scripts/check-profile.sh "$dest" "$profile"
-            scripts/get-manifest.sh "$dest" "$profile" "$PACKAGES_FILE" "manifests/manifest-${id}.txt"
-          done
-
-      - name: Upload manifests
-        uses: actions/upload-artifact@v7
-        with:
-          name: manifests
-          path: manifests/*.txt
-          if-no-files-found: error
-
-      - name: List manifests sorted by firmware-target id
-        id: list_manifests
-        env:
-          MATRIX: ${{ steps.config.outputs.matrix }}
-        run: |
-          set -euo pipefail
-          files="$(echo "$MATRIX" | jq -r '.include | sort_by(.id) | .[] | "manifests/manifest-" + .id + ".txt"')"
-          {
-            echo "files<<MANIFEST_EOF"
-            echo "$files"
-            echo "MANIFEST_EOF"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Compute fingerprint
-        id: fingerprint
-        uses: ./.github/actions/fingerprint
-        with:
-          openwrt_version: ${{ steps.openwrt.outputs.version }}
-          targets_file: ${{ steps.config.outputs.targets_file }}
-          packages_file: ${{ steps.config.outputs.packages_file }}
-          feed_url: ${{ env.FEED_URL }}
-          manifests: ${{ steps.list_manifests.outputs.files }}
-
-      - name: Release gate
-        id: gate
-        uses: ./.github/actions/release-gate
-        with:
-          fingerprint: ${{ steps.fingerprint.outputs.fingerprint }}
-
-      - name: Decide build
-        id: decide
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          GATE_CHANGED: ${{ steps.gate.outputs.changed }}
-          FORCE: ${{ github.event.inputs.force }}
-        run: |
-          set -euo pipefail
-          if [ "$FORCE" = "true" ] || [ "$EVENT_NAME" = "pull_request" ]; then
-            changed=true
-          else
-            changed="$GATE_CHANGED"
-          fi
-          echo "changed=$changed" >> "$GITHUB_OUTPUT"
-          if [ "$changed" = "true" ]; then
-            echo "build_id=$(date -u +%Y%m%dT%H%M%SZ)" >> "$GITHUB_OUTPUT"
-            echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
-          fi
+          echo "build_id=$(date -u +%Y%m%dT%H%M%SZ)" >> "$GITHUB_OUTPUT"
+          echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build ${{ matrix.id }}
-    needs: check
-    if: needs.check.outputs.changed == 'true'
+    needs: prepare
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.check.outputs.matrix) }}
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v7
 
@@ -152,10 +67,10 @@ jobs:
         id: ib
         uses: ./.github/actions/setup-imagebuilder
         with:
-          version: ${{ needs.check.outputs.version }}
+          version: ${{ needs.prepare.outputs.version }}
           target: ${{ matrix.target }}
           subtarget: ${{ matrix.subtarget }}
-          series: ${{ needs.check.outputs.series }}
+          series: ${{ needs.prepare.outputs.series }}
           feed_url: ${{ env.FEED_URL }}
 
       - name: Validate profile
@@ -164,11 +79,15 @@ jobs:
           PROFILE: ${{ matrix.profile }}
         run: scripts/check-profile.sh "$IB_PATH" "$PROFILE"
 
-      - name: Download manifest
-        uses: actions/download-artifact@v8
-        with:
-          name: manifests
-          path: manifests
+      - name: Resolve manifest
+        env:
+          IB_PATH: ${{ steps.ib.outputs.path }}
+          PROFILE: ${{ matrix.profile }}
+          TARGET_ID: ${{ matrix.id }}
+        run: |
+          set -euo pipefail
+          mkdir -p manifests
+          scripts/get-manifest.sh "$IB_PATH" "$PROFILE" configs/packages.txt "manifests/manifest-${TARGET_ID}.txt"
 
       - name: Collect required packages
         id: packages
@@ -186,10 +105,9 @@ jobs:
 
       - name: Generate firmware metadata
         env:
-          BUILD_ID: ${{ needs.check.outputs.build_id }}
-          TIMESTAMP: ${{ needs.check.outputs.timestamp }}
-          FINGERPRINT: ${{ needs.check.outputs.fingerprint }}
-          OPENWRT_VERSION: ${{ needs.check.outputs.version }}
+          BUILD_ID: ${{ needs.prepare.outputs.build_id }}
+          TIMESTAMP: ${{ needs.prepare.outputs.timestamp }}
+          OPENWRT_VERSION: ${{ needs.prepare.outputs.version }}
           TARGET_ID: ${{ matrix.id }}
           MODEL: ${{ matrix.model }}
           VARIANT: ${{ matrix.variant }}
@@ -201,7 +119,7 @@ jobs:
           set -euo pipefail
           scripts/generate-firmware-metadata.sh \
             build-overlay/etc/firmware-build.json \
-            "$BUILD_ID" "$TIMESTAMP" "$FINGERPRINT" "$OPENWRT_VERSION" \
+            "$BUILD_ID" "$TIMESTAMP" "$OPENWRT_VERSION" \
             "$TARGET_ID" "$MODEL" "$VARIANT" "$TARGET" "$SUBTARGET" "$PROFILE" "$PACKAGES_JSON"
 
       - name: Build image
@@ -209,8 +127,8 @@ jobs:
         env:
           IB_PATH: ${{ steps.ib.outputs.path }}
           PROFILE: ${{ matrix.profile }}
-          OPENWRT_VERSION: ${{ needs.check.outputs.version }}
-          BUILD_ID: ${{ needs.check.outputs.build_id }}
+          OPENWRT_VERSION: ${{ needs.prepare.outputs.version }}
+          BUILD_ID: ${{ needs.prepare.outputs.build_id }}
         run: |
           set -euo pipefail
           image_path="$(scripts/build.sh "$IB_PATH" "$PROFILE" configs/packages.txt build-overlay "$OPENWRT_VERSION" "$BUILD_ID" output)"
@@ -265,33 +183,10 @@ jobs:
           path: release-assets/*
           if-no-files-found: error
 
-  build-required:
-    name: Build
-    needs: [check, build]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Evaluate build requirement
-        env:
-          CHECK_RESULT: ${{ needs.check.result }}
-          BUILD_RESULT: ${{ needs.build.result }}
-          CHANGED: ${{ needs.check.outputs.changed }}
-        run: |
-          set -euo pipefail
-          if [ "$CHECK_RESULT" != "success" ]; then
-            echo "::error::check job did not succeed" >&2
-            exit 1
-          fi
-          if [ "$CHANGED" = "true" ] && [ "$BUILD_RESULT" != "success" ]; then
-            echo "::error::build job was required but result was '$BUILD_RESULT'" >&2
-            exit 1
-          fi
-          echo "build requirement satisfied"
-
   publish:
     name: Publish release
-    needs: [check, build-required]
-    if: needs.check.outputs.changed == 'true' && github.event_name != 'pull_request' && needs.build-required.result == 'success' && github.ref == 'refs/heads/main'
+    needs: [prepare, build]
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -307,11 +202,10 @@ jobs:
 
       - name: Assemble version.json
         env:
-          BUILD_ID: ${{ needs.check.outputs.build_id }}
-          TIMESTAMP: ${{ needs.check.outputs.timestamp }}
-          FINGERPRINT: ${{ needs.check.outputs.fingerprint }}
-          OPENWRT_VERSION: ${{ needs.check.outputs.version }}
-          MATRIX: ${{ needs.check.outputs.matrix }}
+          BUILD_ID: ${{ needs.prepare.outputs.build_id }}
+          TIMESTAMP: ${{ needs.prepare.outputs.timestamp }}
+          OPENWRT_VERSION: ${{ needs.prepare.outputs.version }}
+          MATRIX: ${{ needs.prepare.outputs.matrix }}
         run: |
           set -euo pipefail
           first_id="$(echo "$MATRIX" | jq -r '.include | sort_by(.id) | .[0].id')"
@@ -322,7 +216,7 @@ jobs:
             fragments+=("$(cat "$f")")
           done < <(find artifacts -maxdepth 1 -name 'result-*.json' | sort)
 
-          scripts/generate-version-json.sh version.json "$BUILD_ID" "$TIMESTAMP" "$FINGERPRINT" "$OPENWRT_VERSION" "$packages_json" "${fragments[@]}"
+          scripts/generate-version-json.sh version.json "$BUILD_ID" "$TIMESTAMP" "$OPENWRT_VERSION" "$packages_json" "${fragments[@]}"
 
       - name: Build sha256sums
         run: (cd artifacts && sha256sum -- *.bin) > sha256sums
@@ -330,7 +224,7 @@ jobs:
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
-          BUILD_ID: ${{ needs.check.outputs.build_id }}
+          BUILD_ID: ${{ needs.prepare.outputs.build_id }}
         run: |
           set -euo pipefail
           tag="firmware-${BUILD_ID}"

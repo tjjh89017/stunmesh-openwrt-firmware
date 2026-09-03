@@ -59,7 +59,7 @@ stay on the same firmware target it started on.
 
 ## Build and CI overview
 
-A daily (and push/manual-triggered) GitHub Actions workflow:
+A weekly (and push/manual-triggered) GitHub Actions workflow:
 
 1. Finds the latest OpenWrt patch release in the configured series
    (`configs/openwrt.yaml`).
@@ -67,14 +67,12 @@ A daily (and push/manual-triggered) GitHub Actions workflow:
    profile.
 3. Resolves the exact package set with `make manifest` for every firmware
    target.
-4. Computes a build fingerprint from the OpenWrt version, project inputs,
-   target/package configuration, and resolved manifests.
-5. Builds firmware only when the fingerprint changed since the last release.
-6. Publishes `*-sysupgrade.bin` images, `version.json`, `sha256sums`, and
-   package manifests as assets on a new GitHub Release.
+4. Builds `*-sysupgrade.bin` images for every configured firmware target.
+5. Publishes the images, `version.json`, `sha256sums`, and package manifests
+   as assets on a new GitHub Release.
 
-A documentation-only change or an unchanged fingerprint does not trigger a
-new firmware build or Release.
+Every run builds and publishes a new Release. A documentation-only change
+(matched by the workflow's `paths-ignore`) does not trigger a run.
 
 ## OpenWrt version selection
 
@@ -84,10 +82,9 @@ https://downloads.openwrt.org/releases/, matches only `25.12.N/` hrefs within
 that series, and picks the highest with `sort -V` to resolve the latest patch
 release.
 
-The resolved version drives the ImageBuilder/feed URLs and enters the build
-fingerprint, so a new upstream patch release is picked up automatically and
-triggers a rebuild and new Release. Moving to a new series (e.g. `25.12` ->
-`26.01`) means editing `configs/openwrt.yaml`.
+The resolved version drives the ImageBuilder/feed URLs. Every scheduled,
+push, or manual run resolves it fresh and builds against it. Moving to a
+new series (e.g. `25.12` -> `26.01`) means editing `configs/openwrt.yaml`.
 
 ## Releases
 
@@ -118,12 +115,10 @@ composite actions in `.github/actions/`:
 - `resolve-openwrt` — resolves the latest patch release.
 - `setup-imagebuilder` — downloads, caches, and extracts the ImageBuilder,
   then configures the `stunmesh-openwrt` package feed.
-- `fingerprint` — computes the project input hash and build fingerprint.
-- `release-gate` — compares the fingerprint against the latest Release.
 
-Jobs: `check` (gate) -> `build` (matrix, only when changed) -> `build-required`
-(single required status check) -> `publish` (atomic Release, main only,
-never on `pull_request`).
+Jobs: `prepare` (resolve the OpenWrt version and build matrix) -> `build`
+(matrix, every run) -> `publish` (atomic Release, main only) -> `prune`
+(keeps the newest 10 Releases).
 
 ### Package feed
 
