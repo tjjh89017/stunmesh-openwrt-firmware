@@ -40,3 +40,10 @@ firmware_targets:
     target: mediatek
     subtarget: filogic
     profile: cudy_tr3000-v1
+
+  - id: gl-mt300n-v2
+    model: gl-mt300n-v2
+    variant: default
+    target: ramips
+    subtarget: mt76x8
+    profile: glinet_gl-mt300n-v2
