@@ -1,0 +1,21 @@
+#!/bin/sh
+# First-boot hostname: "<MODEL>-<xxx>", board name after the vendor
+# prefix in upper case, last three hex digits of the phy0 MAC in lower
+# case. /etc/config/hostname-setup is the one-shot marker; sysupgrade
+# keeps /etc/config, "sysupgrade -n" and firstboot drop it.
+
+[ -e /etc/config/hostname-setup ] && exit 0
+touch /etc/config/hostname-setup
+
+. /lib/functions.sh
+
+model="$(board_name | sed 's/^[^,]*,//' | tr 'a-z' 'A-Z')"
+suffix="$(cat /sys/class/ieee80211/phy0/macaddress 2>/dev/null | tr -d ':' | tail -c 4 | tr 'A-Z' 'a-z')"
+[ -n "$model" ] && [ -n "$suffix" ] || exit 0
+name="$model-$suffix"
+
+uci set system.@system[0].hostname="$name"
+uci commit system
+echo "$name" > /proc/sys/kernel/hostname
+
+exit 0

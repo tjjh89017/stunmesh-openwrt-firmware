@@ -8,7 +8,7 @@
 # /etc/config, so a kept config carries the marker and is left
 # alone; "sysupgrade -n" and firstboot drop it and get a fresh setup.
 #
-# Name: "<MODEL>-<xxx>", board name after the vendor prefix in upper
+# SSID: "<MODEL>-<xxx>", board name after the vendor prefix in upper
 # case, last three hex digits of the phy0 MAC in lower case. OpenWrt
 # 25.12 puts "disabled" on the wifi-iface, older releases on the radio.
 
@@ -29,9 +29,5 @@ for iface in $(uci -q show wireless | sed -n 's/^wireless\.\([^.]*\)=wifi-iface$
 	[ -n "$radio" ] && uci set "wireless.$radio.disabled=0"
 done
 uci commit wireless
-
-uci set system.@system[0].hostname="$name"
-uci commit system
-echo "$name" > /proc/sys/kernel/hostname
 
 exit 0
