@@ -103,9 +103,10 @@ jobs:
         id: packages
         env:
           MANIFEST_FILE: manifests/manifest-${{ matrix.id }}.txt
+          TARGET_ID: ${{ matrix.id }}
         run: |
           set -euo pipefail
-          json="$(scripts/collect-packages.sh "$MANIFEST_FILE" configs/packages.txt)"
+          json="$(scripts/collect-packages.sh "$MANIFEST_FILE" "packages/packages-${TARGET_ID}.txt")"
           echo "json=$json" >> "$GITHUB_OUTPUT"
 
       - name: Prepare files overlay
@@ -185,7 +186,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release-assets
-          cp output/*.bin "result-${TARGET_ID}.json" "manifests/manifest-${TARGET_ID}.txt" release-assets/
+          cp output/*.bin "result-${TARGET_ID}.json" "manifests/manifest-${TARGET_ID}.txt" "packages/packages-${TARGET_ID}.txt" release-assets/
 
       - name: Upload image artifact
         uses: actions/upload-artifact@v7
@@ -220,7 +221,7 @@ jobs:
         run: |
           set -euo pipefail
           first_id="$(echo "$MATRIX" | jq -r '.include | sort_by(.id) | .[0].id')"
-          packages_json="$(scripts/collect-packages.sh "artifacts/manifest-${first_id}.txt" configs/packages.txt)"
+          packages_json="$(scripts/collect-packages.sh "artifacts/manifest-${first_id}.txt" "artifacts/packages-${first_id}.txt")"
 
           fragments=()
           while IFS= read -r f; do
