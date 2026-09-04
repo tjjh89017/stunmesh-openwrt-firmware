@@ -5,7 +5,6 @@ firmware_targets:
     target: mediatek
     subtarget: filogic
     profile: cudy_tr3000-v1
-    extra_packages: kmod-vrf
 
   - id: gl-ar300m-nand
     model: gl-ar300m
@@ -13,7 +12,6 @@ firmware_targets:
     target: ath79
     subtarget: nand
     profile: glinet_gl-ar300m-nand
-    extra_packages: kmod-vrf
 
   - id: gl-ar300m-nor
     model: gl-ar300m
@@ -21,7 +19,6 @@ firmware_targets:
     target: ath79
     subtarget: nand
     profile: glinet_gl-ar300m-nor
-    extra_packages: kmod-vrf
 
   - id: gl-ar750s-nor
     model: gl-ar750s
@@ -29,7 +26,6 @@ firmware_targets:
     target: ath79
     subtarget: nand
     profile: glinet_gl-ar750s-nor
-    extra_packages: kmod-vrf
 
   - id: gl-ar750s-nor-nand
     model: gl-ar750s
@@ -37,7 +33,6 @@ firmware_targets:
     target: ath79
     subtarget: nand
     profile: glinet_gl-ar750s-nor-nand
-    extra_packages: kmod-vrf
 
   - id: gl-microuter-n300
     model: gl-microuter-n300
@@ -45,6 +40,7 @@ firmware_targets:
     target: ramips
     subtarget: mt76x8
     profile: glinet_microuter-n300
+    exclude_packages: kmod-vrf
 
   - id: gl-mt300n-v2
     model: gl-mt300n-v2
@@ -52,3 +48,4 @@ firmware_targets:
     target: ramips
     subtarget: mt76x8
     profile: glinet_gl-mt300n-v2
+    exclude_packages: kmod-vrf

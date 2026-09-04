@@ -83,10 +83,11 @@ jobs:
         env:
           TARGET_ID: ${{ matrix.id }}
           EXTRA_PACKAGES: ${{ matrix.extra_packages }}
+          EXCLUDE_PACKAGES: ${{ matrix.exclude_packages }}
         run: |
           set -euo pipefail
           mkdir -p packages
-          scripts/prepare-packages.sh configs/packages.txt "$EXTRA_PACKAGES" "packages/packages-${TARGET_ID}.txt"
+          scripts/prepare-packages.sh configs/packages.txt "$EXTRA_PACKAGES" "packages/packages-${TARGET_ID}.txt" "$EXCLUDE_PACKAGES"
 
       - name: Resolve manifest
         env:

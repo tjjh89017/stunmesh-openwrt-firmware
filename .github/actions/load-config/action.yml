@@ -3,7 +3,7 @@ description: Parse configs/firmware-targets.yaml, configs/openwrt.yaml, and conf
 
 outputs:
   matrix:
-    description: 'Build matrix, {"include":[{id,model,variant,target,subtarget,profile,extra_packages?}, ...]}'
+    description: 'Build matrix, {"include":[{id,model,variant,target,subtarget,profile,extra_packages?,exclude_packages?}, ...]}'
     value: ${{ steps.parse.outputs.matrix }}
   ib_pairs:
     description: 'JSON array of unique {target,subtarget} ImageBuilder pairs'
