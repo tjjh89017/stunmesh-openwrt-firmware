@@ -111,7 +111,11 @@ so an updater can identify its exact firmware target and check for a newer
 The workflow lives in `.github/workflows/firmware.yml` and is built from
 composite actions in `.github/actions/`:
 
-- `load-config` — parses `configs/` into the build matrix.
+- `load-config` — parses `configs/` into the build matrix. A firmware
+  target's optional `extra_packages` field adds packages (space-separated)
+  on top of `configs/packages.txt` for that target only, for packages that
+  only exist on some OpenWrt target/subtarget combinations (e.g. `kmod-vrf`,
+  which ramips does not build).
 - `resolve-openwrt` — resolves the latest patch release.
 - `setup-imagebuilder` — downloads, caches, and extracts the ImageBuilder,
   then configures the `stunmesh-openwrt` package feed.

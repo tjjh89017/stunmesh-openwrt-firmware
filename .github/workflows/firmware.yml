@@ -79,6 +79,15 @@ jobs:
           PROFILE: ${{ matrix.profile }}
         run: scripts/check-profile.sh "$IB_PATH" "$PROFILE"
 
+      - name: Prepare package list
+        env:
+          TARGET_ID: ${{ matrix.id }}
+          EXTRA_PACKAGES: ${{ matrix.extra_packages }}
+        run: |
+          set -euo pipefail
+          mkdir -p packages
+          scripts/prepare-packages.sh configs/packages.txt "$EXTRA_PACKAGES" "packages/packages-${TARGET_ID}.txt"
+
       - name: Resolve manifest
         env:
           IB_PATH: ${{ steps.ib.outputs.path }}
@@ -87,7 +96,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p manifests
-          scripts/get-manifest.sh "$IB_PATH" "$PROFILE" configs/packages.txt "manifests/manifest-${TARGET_ID}.txt"
+          scripts/get-manifest.sh "$IB_PATH" "$PROFILE" "packages/packages-${TARGET_ID}.txt" "manifests/manifest-${TARGET_ID}.txt"
 
       - name: Collect required packages
         id: packages
@@ -127,11 +136,12 @@ jobs:
         env:
           IB_PATH: ${{ steps.ib.outputs.path }}
           PROFILE: ${{ matrix.profile }}
+          TARGET_ID: ${{ matrix.id }}
           OPENWRT_VERSION: ${{ needs.prepare.outputs.version }}
           BUILD_ID: ${{ needs.prepare.outputs.build_id }}
         run: |
           set -euo pipefail
-          image_path="$(scripts/build.sh "$IB_PATH" "$PROFILE" configs/packages.txt build-overlay "$OPENWRT_VERSION" "$BUILD_ID" output)"
+          image_path="$(scripts/build.sh "$IB_PATH" "$PROFILE" "packages/packages-${TARGET_ID}.txt" build-overlay "$OPENWRT_VERSION" "$BUILD_ID" output)"
           echo "image_path=$image_path" >> "$GITHUB_OUTPUT"
 
       - name: Verify image

@@ -3,7 +3,6 @@ luci-ssl
 luci-app-attendedsysupgrade
 wireguard-tools
 luci-proto-wireguard
-kmod-vrf
 travelmate
 luci-app-travelmate
 stunmesh-agent
