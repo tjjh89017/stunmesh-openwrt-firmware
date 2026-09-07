@@ -74,6 +74,18 @@ A weekly (and push/manual-triggered) GitHub Actions workflow:
 Every run builds and publishes a new Release. A documentation-only change
 (matched by the workflow's `paths-ignore`) does not trigger a run.
 
+## Picking up a new stunmesh release
+
+This repo pins no stunmesh version. `configs/packages.txt` lists
+`stunmesh-agent`, and `firmware.yml` installs whatever build of that package
+the `stunmesh-openwrt` apk feed currently serves.
+
+The upstream release order is: `stunmesh-go` release, then
+`stunmesh-provisioner`, then the `stunmesh-openwrt` feed rebuild, then this
+repo. Once the feed has published the new `stunmesh-agent` build, either
+wait for the weekly scheduled run or trigger `firmware.yml` manually
+(Actions -> "firmware.yml" -> Run workflow) to build and publish immediately.
+
 ## OpenWrt version selection
 
 The OpenWrt series is pinned manually in `configs/openwrt.yaml`

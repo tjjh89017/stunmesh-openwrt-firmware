@@ -1,0 +1,20 @@
+name: pr
+
+on:
+  pull_request:
+    paths:
+      - "configs/**"
+      - ".github/actions/load-config/**"
+      - ".github/workflows/pr.yml"
+
+jobs:
+  validate-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Parse firmware config
+        run: |
+          set -euo pipefail
+          python3 .github/actions/load-config/parse-config.py \
+            configs/firmware-targets.yaml configs/openwrt.yaml
