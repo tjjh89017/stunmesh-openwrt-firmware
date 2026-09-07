@@ -7,7 +7,3 @@ travelmate
 luci-app-travelmate
 stunmesh-agent
 kmod-vrf
-kmod-usb-net-cdc-ether
-usb-modeswitch
-kmod-usb-net-rndis
-kmod-usb-net-cdc-ncm
