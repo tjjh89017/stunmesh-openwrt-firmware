@@ -7,7 +7,7 @@ profile="${2:?profile is required}"
 
 info_output="$(make --no-print-directory -C "$ib_dir" info)"
 
-if ! printf '%s\n' "$info_output" | grep -qE "^${profile}:"; then
+if ! grep -qE "^${profile}:" <<<"$info_output"; then
   echo "error: profile '${profile}' not found in ${ib_dir}" >&2
   exit 1
 fi

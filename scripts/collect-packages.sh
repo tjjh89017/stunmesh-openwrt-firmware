@@ -21,7 +21,7 @@ while IFS= read -r pkg; do
   case "$pkg" in -*) continue ;; esac
   case " ${excludes} " in *" ${pkg} "*) continue ;; esac
   # manifest lines look like "pkgname - version"
-  version="$(grep -E "^${pkg} - " "$manifest_file" | head -n1 | sed -E "s/^${pkg} - //")"
+  version="$(grep -m1 -E "^${pkg} - " "$manifest_file" | sed -E "s/^${pkg} - //")"
   if [ -z "$version" ]; then
     echo "error: package '${pkg}' not found in manifest" >&2
     exit 1
